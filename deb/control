@@ -1,0 +1,7 @@
+Package: query_engine
+Version: [[version]]
+Section: main
+Priority: optional
+Architecture: all
+Maintainer: rna-group@inmobi.com
+Description: REST-ful service Query builder for Clarity

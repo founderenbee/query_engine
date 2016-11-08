@@ -1,0 +1,104 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:util="http://www.springframework.org/schema/util"
+       xsi:schemaLocation="
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.2.xsd
+http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.2.xsd">
+    <context:component-scan base-package="com.inmobi.corp.clarity" />
+    <context:property-placeholder location="classpath*:application-live.properties"/>
+    <!-- context:property-placeholder location="application-${spring.profiles.active}.properties" /-->
+
+    <bean id="hikariConfigMysql" class="com.zaxxer.hikari.HikariConfig" >
+        <property name="poolName" value="springHikariCPMysql" />
+        <property name="connectionTestQuery" value="SELECT 1" />
+        <property name="dataSourceClassName" value="com.mysql.jdbc.jdbc2.optional.MysqlDataSource" />
+        <property name="dataSourceProperties">
+            <props>
+                <prop key="url">${db.url}</prop>
+                <prop key="user">${db.username}</prop>
+                <prop key="password">${db.password}</prop>
+            </props>
+            <!-- props>
+                <prop key="url">jdbc:mysql://localhost/qa_rna_metastore</prop>
+                <prop key="user">root</prop>
+                <prop key="password">root</prop>
+            </props -->
+        </property>
+    </bean>
+
+    <!-- bean id="hikariConfigVertica" class="com.zaxxer.hikari.HikariConfig" >
+        <property name="poolName" value="springHikariCPVertica" />
+        <property name="connectionTestQuery" value="SELECT 1" />
+        <property name="dataSourceClassName" value="com.vertica.jdbc.DataSource" />
+        <property name="maximumPoolSize" value="2"/>
+        <property name="dataSourceProperties">
+            <props>
+                <prop key="URL" >${vertica.connection.string}</prop>
+                <prop key="userID" >${vertica.connection.username}</prop>
+                <prop key="password" >${vertica.connection.password}</prop>
+                <prop key="searchPath" >${vertica.connection.searchPath}</prop>
+            </props>
+        </property>
+    </bean -->
+
+    <bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
+        <constructor-arg ref="hikariConfigMysql" />
+    </bean>
+
+    <!-- Configure Spring's transaction manager to use a DataSource -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource" />
+    </bean>
+
+    <!-- Configure jOOQ's ConnectionProvider to use Spring's TransactionAwareDataSourceProxy,
+         which can dynamically discover the transaction context -->
+    <bean id="transactionAwareDataSource"  class="org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy">
+        <constructor-arg ref="dataSource" />
+    </bean>
+
+    <bean class="org.jooq.impl.DataSourceConnectionProvider" name="connectionProvider">
+        <constructor-arg ref="transactionAwareDataSource" />
+    </bean>
+
+    <!-- Configure the DSL object, optionally overriding jOOQ Exceptions with Spring Exceptions -->
+    <bean id="dsl" class="org.jooq.impl.DefaultDSLContext">
+        <constructor-arg ref="config" />
+    </bean>
+
+    <bean id="exceptionTranslator" class="com.inmobi.corp.clarity.exception.ExceptionTranslator" />
+
+    <!-- Invoking an internal, package-private constructor for the example
+         Implement your own Configuration for more reliable behaviour -->
+    <bean class="org.jooq.impl.DefaultConfiguration" name="config">
+        <property name="SQLDialect"><value type="org.jooq.SQLDialect">MYSQL</value></property>
+        <property name="connectionProvider" ref="connectionProvider" />
+        <property name="executeListenerProvider">
+            <array>
+                <bean class="org.jooq.impl.DefaultExecuteListenerProvider">
+                    <constructor-arg index="0" ref="exceptionTranslator"/>
+                </bean>
+            </array>
+        </property>
+    </bean>
+
+    <bean id="VOLTDB" class="com.inmobi.corp.clarity.query.impl.VoltdbSQLQueryBuilder" scope="prototype" />
+    <bean id="VERTICA" class="com.inmobi.corp.clarity.query.impl.VerticaSQLQueryBuilder" scope="prototype" />
+    <bean id="VERTICA_QA" class="com.inmobi.corp.clarity.query.impl.VerticaSQLQueryBuilder" scope="prototype" />
+    <bean id="LENS" class="com.inmobi.corp.clarity.query.impl.LensSQLQueryBuilder" scope="prototype" />
+    <bean id="DRUID" class="com.inmobi.corp.clarity.query.impl.DruidQueryBuilder" scope="prototype" />
+
+    <util:list id="numericTypes" value-type="java.lang.String" scope="singleton" >
+        <value>FLOAT</value>
+        <value>INTEGER</value>
+        <value>TINYINT</value>
+        <value>SMALLINT</value>
+        <value>BIGINT</value>
+    </util:list>
+    <util:list id="dateTypes" value-type="java.lang.String" scope="singleton" >
+        <value>TIMESTAMP</value>
+        <value>DATE</value>
+        <value>DATETIME</value>
+    </util:list>
+</beans>
